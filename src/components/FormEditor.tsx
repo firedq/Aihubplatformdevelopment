@@ -1,0 +1,373 @@
+import { useState } from 'react';
+import { Send, Sparkles, Eye, Save, ArrowLeft, Layers } from 'lucide-react';
+import { FormPreviewGrid } from './FormPreviewGrid';
+import { FieldConfiguratorGrid } from './FieldConfiguratorGrid';
+
+interface Message {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  formConfig?: any;
+}
+
+export function FormEditor({ 
+  initialConfig, 
+  onBack, 
+  onSave 
+}: { 
+  initialConfig?: any; 
+  onBack: () => void; 
+  onSave: (config: any) => void;
+}) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentFormConfig, setCurrentFormConfig] = useState<any>(initialConfig || null);
+  const [selectedField, setSelectedField] = useState<string | null>(null);
+
+  const handleSend = () => {
+    if (!input.trim() || isProcessing) return;
+
+    const userMessage: Message = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMessage]);
+    setIsProcessing(true);
+
+    // Simulate AI processing
+    setTimeout(() => {
+      let response: Message;
+      
+      if (input.includes('供应商') || input.includes('报价')) {
+        const formConfig = generateSupplierQuoteForm();
+        response = {
+          role: 'assistant',
+          content: '已为您生成【供应商报价表单】。我已对接致远OA的供应商管理系统，提取了相关字段和业务规则。您可以预览表单结构，点击字段可配置详细规则。',
+          formConfig
+        };
+        setCurrentFormConfig(formConfig);
+      } else if (input.includes('级联') || input.includes('下拉')) {
+        response = {
+          role: 'assistant',
+          content: '已优化表单配置，级联规则已生效。',
+        };
+      } else if (input.includes('校验') || input.includes('超过')) {
+        response = {
+          role: 'assistant',
+          content: '已添加金额校验规则。',
+        };
+      } else if (input.includes('添加') && input.includes('字段')) {
+        response = {
+          role: 'assistant',
+          content: '已添加新字段。您可以在右侧配置面板中进行详细设置。',
+        };
+      } else {
+        response = {
+          role: 'assistant',
+          content: '我可以帮您：\n1. 生成表单字段\n2. 配置字段校验和级联规则\n3. 添加表格和附件字段\n4. 优化表单布局\n\n请具体描述您的需求。'
+        };
+      }
+
+      setMessages(prev => [...prev, response]);
+      setIsProcessing(false);
+    }, 1500);
+
+    setInput('');
+  };
+
+  const handleSaveForm = () => {
+    if (currentFormConfig) {
+      onSave(currentFormConfig);
+      setMessages(prev => [...prev, {
+        role: 'system',
+        content: '✓ 表单已保存。'
+      }]);
+    }
+  };
+
+  const handleFieldUpdate = (fieldId: string, updates: any) => {
+    if (!currentFormConfig) return;
+    
+    setCurrentFormConfig((prev: any) => ({
+      ...prev,
+      fields: prev.fields.map((field: any) =>
+        field.id === fieldId ? { ...field, ...updates } : field
+      )
+    }));
+  };
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={onBack}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-slate-600" />
+          </button>
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">
+              {currentFormConfig?.name || '新建表单'}
+            </h2>
+            <p className="text-sm text-slate-600 mt-0.5">
+              {currentFormConfig?.description || '使用AI助手快速设计表单'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleSaveForm}
+          disabled={!currentFormConfig}
+          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <Save className="w-4 h-4" />
+          保存
+        </button>
+      </div>
+
+      {/* Main Content */}
+      <div className="grid grid-cols-12 gap-4 h-[calc(100vh-280px)]">
+        {/* Left: Chat Interface */}
+        <div className="col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
+          <div className="px-4 py-3 border-b border-slate-200">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 text-sm">
+              <Sparkles className="w-4 h-4 text-purple-600" />
+              AI 设计助手
+            </h3>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {messages.length === 0 && (
+              <div className="text-center py-8">
+                <Sparkles className="w-12 h-12 mx-auto mb-3 text-purple-300" />
+                <p className="text-sm text-slate-600">开始对话设计表单</p>
+              </div>
+            )}
+            {messages.map((msg, idx) => (
+              <div
+                key={idx}
+                className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              >
+                <div
+                  className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                    msg.role === 'user'
+                      ? 'bg-blue-600 text-white'
+                      : msg.role === 'system'
+                      ? 'bg-green-50 text-green-800 border border-green-200'
+                      : 'bg-slate-100 text-slate-900'
+                  }`}
+                >
+                  <div className="text-xs whitespace-pre-line">{msg.content}</div>
+                </div>
+              </div>
+            ))}
+            {isProcessing && (
+              <div className="flex justify-start">
+                <div className="bg-slate-100 rounded-lg px-3 py-2">
+                  <div className="flex items-center gap-2 text-xs text-slate-600">
+                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" />
+                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <div className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                    <span className="ml-1">处理中...</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Input */}
+          <div className="p-3 border-t border-slate-200">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                placeholder="输入需求..."
+                className="flex-1 px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={handleSend}
+                disabled={isProcessing || !input.trim()}
+                className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                <Send className="w-3 h-3" />
+              </button>
+            </div>
+            
+            {/* Quick Actions */}
+            <div className="mt-2 flex flex-wrap gap-1">
+              <button
+                onClick={() => setInput('生成供应商报价表单')}
+                className="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded hover:bg-slate-200"
+              >
+                生成表单
+              </button>
+              <button
+                onClick={() => setInput('添加附件字段')}
+                className="px-2 py-1 text-xs bg-slate-100 text-slate-700 rounded hover:bg-slate-200"
+              >
+                添加字段
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Middle: Form Preview */}
+        <div className="col-span-6 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
+          <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2 text-sm">
+              <Eye className="w-4 h-4 text-blue-600" />
+              表单预览
+            </h3>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-6">
+            {currentFormConfig ? (
+              <FormPreviewGrid 
+                config={currentFormConfig} 
+                onFieldClick={(fieldId) => setSelectedField(fieldId)}
+                selectedFieldId={selectedField}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400">
+                <div className="text-center">
+                  <Layers className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                  <p className="text-sm">开始对话设计表单</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right: Field Configurator */}
+        <div className="col-span-3 bg-white rounded-xl shadow-sm border border-slate-200 flex flex-col">
+          <div className="flex-1 overflow-y-auto">
+            {selectedField && currentFormConfig ? (
+              <FieldConfiguratorGrid
+                field={currentFormConfig.fields.find((f: any) => f.id === selectedField)}
+                onUpdate={(updates) => handleFieldUpdate(selectedField, updates)}
+                onClose={() => setSelectedField(null)}
+              />
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400 p-6">
+                <div className="text-center">
+                  <Eye className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-xs">点击表单中的字段查看和编辑配置规则</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Generate supplier quote form configuration
+function generateSupplierQuoteForm() {
+  return {
+    id: 'supplier-quote-' + Date.now(),
+    name: '供应商报价表单',
+    description: '对接致远OA供应商管理系统',
+    source: '致远OA',
+    type: 'form',
+    gridColumns: 12,
+    fields: [
+      {
+        id: 'quote_date',
+        label: '选择日期',
+        type: 'date',
+        required: false,
+        row: 0,
+        col: 0,
+        rowSpan: 1,
+        colSpan: 12,
+        section: 'default',
+      },
+      {
+        id: 'supplier_name',
+        label: '供应商名称',
+        type: 'text',
+        required: true,
+        placeholder: '请输入',
+        row: 1,
+        col: 0,
+        rowSpan: 1,
+        colSpan: 12,
+        section: '应商方信息',
+      },
+      {
+        id: 'contact_person',
+        label: '联系人',
+        type: 'text',
+        required: false,
+        placeholder: '请输入',
+        row: 2,
+        col: 0,
+        rowSpan: 1,
+        colSpan: 12,
+        section: '应商方信息',
+      },
+      {
+        id: 'contact_phone',
+        label: '联系方式',
+        type: 'tel',
+        required: false,
+        placeholder: '请输入',
+        row: 3,
+        col: 0,
+        rowSpan: 1,
+        colSpan: 12,
+        section: '应商方信息',
+      },
+      {
+        id: 'detail_table',
+        label: '报价明细',
+        type: 'table',
+        required: false,
+        columns: [
+          { id: 'item_name', label: '物品名称', type: 'text', width: 200 },
+          { id: 'specification', label: '规格', type: 'text', width: 120 },
+          { id: 'qty', label: '数量', type: 'number', width: 100 },
+          { id: 'unit_price', label: '单价(元)', type: 'number', width: 120 },
+          { id: 'total_price', label: '总价', type: 'number', computed: true, formula: 'qty * unit_price', width: 120 },
+        ],
+        minRows: 1,
+        maxRows: 50,
+        defaultRows: 3,
+        row: 4,
+        col: 0,
+        rowSpan: 1,
+        colSpan: 12,
+        section: '报价明细',
+      },
+      {
+        id: 'total_amount',
+        label: '总价',
+        type: 'text',
+        required: false,
+        placeholder: '请输入',
+        row: 5,
+        col: 0,
+        rowSpan: 1,
+        colSpan: 12,
+        section: '报价明细',
+      },
+      {
+        id: 'attachments',
+        label: '相关投标资料',
+        type: 'file',
+        required: false,
+        row: 6,
+        col: 0,
+        rowSpan: 1,
+        colSpan: 12,
+        section: 'default',
+      },
+    ],
+    actions: [
+      { id: 'submit', label: '提交报价', type: 'primary' },
+      { id: 'save_draft', label: '保存草稿', type: 'secondary' },
+    ],
+  };
+}
